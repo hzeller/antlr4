@@ -25,8 +25,7 @@ using namespace antlrcpp;
 namespace {
 
   void combineCommonParents(std::vector<Ref<const PredictionContext>> &parents) {
-    std::unordered_set<Ref<const PredictionContext>> uniqueParents;
-    uniqueParents.reserve(parents.size());
+    std::set<Ref<const PredictionContext>> uniqueParents;
     for (const auto &parent : parents) {
       uniqueParents.insert(parent);
     }
@@ -35,10 +34,12 @@ namespace {
     }
   }
 
+  using VisitedMap = FlatHashMap<Ref<const PredictionContext>,
+      Ref<const PredictionContext>>;
+
   Ref<const PredictionContext> getCachedContextImpl(const Ref<const PredictionContext> &context,
                                                     PredictionContextCache &contextCache,
-                                                    std::unordered_map<Ref<const PredictionContext>,
-                                                    Ref<const PredictionContext>> &visited) {
+                                                    VisitedMap &visited) {
     if (context->isEmpty()) {
       return context;
     }
@@ -100,7 +101,7 @@ namespace {
 
   void getAllContextNodesImpl(const Ref<const PredictionContext> &context,
                               std::vector<Ref<const PredictionContext>> &nodes,
-                              std::unordered_set<const PredictionContext*> &visited) {
+                              std::set<const PredictionContext*> &visited) {
 
     if (visited.find(context.get()) != visited.end()) {
       return; // Already done.
@@ -114,7 +115,8 @@ namespace {
     }
   }
 
-  size_t insertOrAssignNodeId(std::unordered_map<const PredictionContext*, size_t> &nodeIds, size_t &nodeId, const PredictionContext *node) {
+  template <typename Map>
+  size_t insertOrAssignNodeId(Map &nodeIds, size_t &nodeId, const PredictionContext *node) {
     auto existing = nodeIds.find(node);
     if (existing != nodeIds.end()) {
       return existing->second;
@@ -438,7 +440,7 @@ std::string PredictionContext::toDOTString(const Ref<const PredictionContext> &c
   ss << "digraph G {\n" << "rankdir=LR;\n";
 
   std::vector<Ref<const PredictionContext>> nodes = getAllContextNodes(context);
-  std::unordered_map<const PredictionContext*, size_t> nodeIds;
+  std::map<const PredictionContext*, size_t> nodeIds;
   size_t nodeId = 0;
 
   for (const auto &current : nodes) {
@@ -494,13 +496,13 @@ std::string PredictionContext::toDOTString(const Ref<const PredictionContext> &c
 // The "visited" map is just a temporary structure to control the retrieval process (which is recursive).
 Ref<const PredictionContext> PredictionContext::getCachedContext(const Ref<const PredictionContext> &context,
                                                                  PredictionContextCache &contextCache) {
-  std::unordered_map<Ref<const PredictionContext>, Ref<const PredictionContext>> visited;
+  VisitedMap visited;
   return getCachedContextImpl(context, contextCache, visited);
 }
 
 std::vector<Ref<const PredictionContext>> PredictionContext::getAllContextNodes(const Ref<const PredictionContext> &context) {
   std::vector<Ref<const PredictionContext>> nodes;
-  std::unordered_set<const PredictionContext*> visited;
+  std::set<const PredictionContext*> visited;
   getAllContextNodesImpl(context, nodes, visited);
   return nodes;
 }

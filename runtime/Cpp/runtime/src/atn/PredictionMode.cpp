@@ -10,6 +10,7 @@
 #include "SemanticContext.h"
 
 #include "PredictionMode.h"
+#include "FlatHashMap.h"
 
 using namespace antlr4;
 using namespace antlr4::atn;
@@ -21,7 +22,7 @@ struct AltAndContextConfigHasher
    * The hash code is only a function of the {@link ATNState#stateNumber}
    * and {@link ATNConfig#context}.
    */
-  size_t operator () (ATNConfig *o) const {
+  size_t operator () (const ATNConfig *o) const {
     size_t hashCode = misc::MurmurHash::initialize(7);
     hashCode = misc::MurmurHash::update(hashCode, o->state->stateNumber);
     hashCode = misc::MurmurHash::update(hashCode, o->context);
@@ -30,7 +31,7 @@ struct AltAndContextConfigHasher
 };
 
 struct AltAndContextConfigComparer {
-  bool operator()(ATNConfig *a, ATNConfig *b) const
+  bool operator()(const ATNConfig *a, const ATNConfig *b) const
   {
     if (a == b) {
       return true;
@@ -158,8 +159,9 @@ antlrcpp::BitSet PredictionModeClass::getAlts(ATNConfigSet *configs) {
 }
 
 std::vector<antlrcpp::BitSet> PredictionModeClass::getConflictingAltSubsets(ATNConfigSet *configs) {
-  std::unordered_map<ATNConfig*, antlrcpp::BitSet, AltAndContextConfigHasher, AltAndContextConfigComparer> configToAlts;
-  for (auto &config : configs->configs) {
+  FlatHashMap<const ATNConfig*, antlrcpp::BitSet, AltAndContextConfigHasher, AltAndContextConfigComparer> configToAlts;
+  configToAlts.reserve(configs->configs.size());
+  for (const auto &config : configs->configs) {
     configToAlts[config.get()].set(config->alt);
   }
   std::vector<antlrcpp::BitSet> values;
@@ -170,8 +172,8 @@ std::vector<antlrcpp::BitSet> PredictionModeClass::getConflictingAltSubsets(ATNC
   return values;
 }
 
-std::unordered_map<ATNState*, antlrcpp::BitSet> PredictionModeClass::getStateToAltMap(ATNConfigSet *configs) {
-  std::unordered_map<ATNState*, antlrcpp::BitSet> m;
+std::map<ATNState*, antlrcpp::BitSet> PredictionModeClass::getStateToAltMap(ATNConfigSet *configs) {
+  std::map<ATNState*, antlrcpp::BitSet> m;
   for (const auto &c : configs->configs) {
     m[c->state].set(c->alt);
   }
